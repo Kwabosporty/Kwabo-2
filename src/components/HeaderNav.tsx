@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Search, ChevronDown, Menu, X, Globe } from 'lucide-react';
+import { Search, ChevronDown, Menu, X, Globe, ShieldCheck } from 'lucide-react';
 
 interface HeaderNavProps {
   onOpenSearch: () => void;
   onOpenAuth: () => void;
+  onOpenAdmin?: () => void;
   activeNav: string;
   onSelectNav: (nav: string) => void;
   onToggleMobileSidebar: () => void;
@@ -13,6 +14,7 @@ interface HeaderNavProps {
 export const HeaderNav: React.FC<HeaderNavProps> = ({
   onOpenSearch,
   onOpenAuth,
+  onOpenAdmin,
   activeNav,
   onSelectNav,
   onToggleMobileSidebar,
@@ -154,6 +156,19 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
           >
             LOGIN / REGISTER
           </button>
+
+          {onOpenAdmin && (
+            <button
+              id="header-admin-cms-btn"
+              onClick={onOpenAdmin}
+              title="Open KwaboSports Admin CMS & Studio"
+              className="bg-[#1C2028] hover:bg-[#252B36] border border-[#2F384A] hover:border-[#A3E635] text-[#A3E635] text-xs font-bold px-3 py-1.5 sm:py-2 rounded-md transition-all uppercase tracking-wider flex items-center gap-1.5 font-sport cursor-pointer shadow-xs"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-[#A3E635]" />
+              <span className="hidden md:inline">ADMIN CMS</span>
+              <span className="md:hidden">ADMIN</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

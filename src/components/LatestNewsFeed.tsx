@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Clock, MessageSquare, Share2, ArrowRight, Sparkles } from 'lucide-react';
-import { BlogPost, BlogCategoryFilter, ArticleCard } from '../types';
+import { BlogPost, BlogCategoryFilter, ArticleCard, AdminPost } from '../types';
 import { INITIAL_BLOG_POSTS, MORE_BLOG_POSTS } from '../data/blogData';
+import { supabaseService } from '../services/supabaseService';
 
 interface LatestNewsFeedProps {
   onSelectArticle: (article: ArticleCard) => void;
@@ -15,11 +16,63 @@ const CATEGORY_TABS: BlogCategoryFilter[] = [
   'OPINION',
 ];
 
+function mapAdminPostToBlogPost(p: AdminPost): BlogPost {
+  let filter: BlogCategoryFilter = 'ALL';
+  const nameUpper = p.category_name.toUpperCase();
+  if (nameUpper.includes('TRANSFER')) filter = 'TRANSFER NEWS';
+  else if (nameUpper.includes('TACTIC') || nameUpper.includes('ANALYSIS')) filter = 'TACTICAL ANALYSIS';
+  else if (nameUpper.includes('REPORT') || nameUpper.includes('MATCH')) filter = 'MATCH REPORTS';
+  else if (nameUpper.includes('OPINION') || nameUpper.includes('COLUMN')) filter = 'OPINION';
+  else filter = 'TRANSFER NEWS';
+
+  return {
+    id: p.id,
+    title: p.title,
+    excerpt: p.excerpt,
+    category: p.category_name,
+    categoryColor: p.category_color,
+    categoryBg: `${p.category_color}20`,
+    categoryFilter: filter,
+    date: p.published_at ? new Date(p.published_at).toLocaleDateString() : 'Today',
+    readTime: p.read_time,
+    image: p.featured_image,
+    author: {
+      name: p.author_name,
+      role: p.author_role,
+      avatar: p.author_avatar,
+    },
+    commentsCount: 14,
+    featured: p.is_featured,
+    content: p.content,
+  };
+}
+
 export const LatestNewsFeed: React.FC<LatestNewsFeedProps> = ({ onSelectArticle }) => {
   const [activeCategory, setActiveCategory] = useState<BlogCategoryFilter>('ALL');
-  const [displayedPosts, setDisplayedPosts] = useState<BlogPost[]>(INITIAL_BLOG_POSTS);
+  const [displayedPosts, setDisplayedPosts] = useState<BlogPost[]>(() => {
+    try {
+      const dbPosts = supabaseService.getPosts().filter((p) => p.status === 'published');
+      if (dbPosts.length > 0) {
+        return dbPosts.map(mapAdminPostToBlogPost);
+      }
+    } catch {
+      // fallback
+    }
+    return INITIAL_BLOG_POSTS;
+  });
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasLoadedMore, setHasLoadedMore] = useState(false);
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const dbPosts = supabaseService.getPosts().filter((p) => p.status === 'published');
+      if (dbPosts.length > 0) {
+        setDisplayedPosts(dbPosts.map(mapAdminPostToBlogPost));
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // Filter posts by active category
   const filteredPosts = displayedPosts.filter((post) => {

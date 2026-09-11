@@ -4,9 +4,10 @@ import { X, Lock, Mail, User, ShieldCheck } from 'lucide-react';
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenAdmin?: () => void;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onOpenAdmin }) => {
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -155,10 +156,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               {tab === 'login' ? 'SIGN IN TO KWABO' : 'JOIN KWABOSPORTS FREE'}
             </button>
 
-            <div className="text-center pt-2">
-              <span className="text-xs text-neutral-500">
+            <div className="text-center pt-2 space-y-2">
+              <span className="text-xs text-neutral-500 block">
                 By continuing, you agree to KwaboSports Terms of Service & Privacy Policy.
               </span>
+
+              {onOpenAdmin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenAdmin();
+                  }}
+                  className="text-xs text-[#A3E635] hover:text-white font-mono underline inline-block pt-1 cursor-pointer"
+                >
+                  Editorial staff? Open Super Admin Console →
+                </button>
+              )}
             </div>
           </form>
         )}

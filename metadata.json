@@ -1,6 +1,6 @@
 {
   "name": "KwaboSports",
-  "description": "Ultra-modern professional sports media platform and live match centre with Bento Box UI.",
+  "description": "Ultra-modern professional sports media platform, live match centre with Bento Box UI, and complete Admin Dashboard with Supabase CMS workflows.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

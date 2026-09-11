@@ -90,3 +90,104 @@ export interface BlogPost {
   featured?: boolean;
   content?: string;
 }
+
+// -------------------------------------------------------------
+// SUPABASE ADMIN SCHEMA & DASHBOARD TYPES
+// -------------------------------------------------------------
+export type AdminRole = 'SUPER_ADMIN' | 'EDITOR' | 'AUTHOR';
+
+export type PostType = 'news' | 'transfer' | 'analysis' | 'opinion';
+export type PostStatus = 'draft' | 'published' | 'scheduled';
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  color: string;
+  post_count: number;
+  created_at: string;
+}
+
+export interface AdminPost {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string;
+  featured_image: string;
+  category_id: string;
+  category_name: string;
+  category_slug: string;
+  category_color: string;
+  post_type: PostType;
+  status: PostStatus | 'PUBLISHED' | 'DRAFT' | 'SCHEDULED';
+  is_featured: boolean; // "Pin as Front-Page Hero Post"
+  author_id: string;
+  author_name: string;
+  author_role: string;
+  author_avatar: string;
+  views: number;
+  view_count?: number; // Alias requested by prompt
+  read_time: string;
+  created_at: string;
+  updated_at: string;
+  published_at?: string | null;
+}
+
+export type Post = AdminPost;
+
+export interface AdminProfile {
+  id: string;
+  email: string;
+  username: string;
+  full_name: string;
+  role: AdminRole;
+  avatar_url: string;
+  created_at: string;
+}
+
+export type AdminUser = AdminProfile;
+
+export interface AdminAuditLog {
+  id: string;
+  admin_id: string;
+  admin_name: string;
+  action: string; // e.g., 'POST_CREATED', 'POST_UPDATED', 'POST_DELETED', 'CATEGORY_CREATED', 'CATEGORY_DELETED', 'SITE_SETTINGS_UPDATED', 'AUTH_LOGIN'
+  target_type: 'post' | 'category' | 'setting' | 'auth';
+  target_id: string;
+  target_title: string;
+  ip_address: string;
+  timestamp: string;
+  details: string;
+}
+
+export type AuditLog = AdminAuditLog;
+
+export interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  type: 'live' | 'audit' | 'post' | 'system';
+}
+
+export interface AdminDashboardStats {
+  total_posts: number;
+  drafts_pending: number;
+  active_categories: number;
+  total_views: number;
+  today_views: number;
+  last_sync_time?: string;
+  cron_status?: string;
+}
+
+export interface SiteSettings {
+  score_ticker_enabled: boolean;
+  ticker_speed: 'slow' | 'normal' | 'fast';
+  pinned_hero_post_id: string;
+  maintenance_mode: boolean;
+  site_title: string;
+  editorial_email: string;
+}

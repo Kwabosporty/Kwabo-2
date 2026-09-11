@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScoreTicker } from './components/ScoreTicker';
 import { HeaderNav } from './components/HeaderNav';
 import { LeftSidebar } from './components/LeftSidebar';
@@ -12,9 +12,11 @@ import { Footer } from './components/Footer';
 import { SearchModal } from './components/SearchModal';
 import { AuthModal } from './components/AuthModal';
 import { ArticleModal } from './components/ArticleModal';
+import { AdminDashboard } from './components/admin/AdminDashboard';
 import { ArticleCard } from './types';
 
 export default function App() {
+  const [currentView, setCurrentView] = useState<'public' | 'admin'>('public');
   const [activeNav, setActiveNav] = useState('all-sports');
   const [selectedSport, setSelectedSport] = useState('football');
   const [selectedLeague, setSelectedLeague] = useState('premier-league');
@@ -25,6 +27,47 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<ArticleCard | null>(null);
+
+  // Check URL hash for direct #admin link
+  useEffect(() => {
+    if (window.location.hash === '#admin') {
+      setCurrentView('admin');
+    }
+    const handleHashChange = () => {
+      if (window.location.hash === '#admin') {
+        setCurrentView('admin');
+      } else {
+        setCurrentView('public');
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const handleNavigateAdmin = () => {
+    setCurrentView('admin');
+    window.location.hash = 'admin';
+  };
+
+  const handleNavigatePublic = () => {
+    setCurrentView('public');
+    window.location.hash = '';
+  };
+
+  if (currentView === 'admin') {
+    return (
+      <>
+        <AdminDashboard
+          onViewPublicSite={handleNavigatePublic}
+          onPreviewArticleModal={(article) => setSelectedArticle(article)}
+        />
+        <ArticleModal
+          article={selectedArticle}
+          onClose={() => setSelectedArticle(null)}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#121212] text-white flex flex-col font-sans selection:bg-[#A3E635] selection:text-black">
@@ -42,6 +85,7 @@ export default function App() {
         }}
         onOpenSearch={() => setIsSearchOpen(true)}
         onOpenAuth={() => setIsAuthOpen(true)}
+        onOpenAdmin={handleNavigateAdmin}
         isMobileSidebarOpen={isMobileSidebarOpen}
         onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
       />
@@ -122,6 +166,7 @@ export default function App() {
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
+        onOpenAdmin={handleNavigateAdmin}
       />
 
       <ArticleModal
