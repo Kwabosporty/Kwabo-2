@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Radio,
   Zap,
+  LogOut,
 } from 'lucide-react';
 import { AdminProfile } from '../../types';
 
@@ -36,6 +37,7 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   currentUser: AdminProfile | null;
   onViewPublicSite: () => void;
+  onLogout?: () => void;
   liveSyncCount?: number;
 }
 
@@ -92,6 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   currentUser,
   onViewPublicSite,
+  onLogout,
 }) => {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
@@ -246,30 +249,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {!isCollapsed && <span className="truncate">View Public Site</span>}
         </button>
 
-        {/* User profile capsule */}
+        {/* User profile capsule and Logout */}
         {currentUser && (
-          <div
-            className={`flex items-center gap-2.5 p-1.5 rounded-lg bg-[#121215] border border-[#27272A] ${
-              isCollapsed ? 'justify-center' : ''
-            }`}
-          >
-            <img
-              src={currentUser.avatar_url}
-              alt={currentUser.full_name}
-              className="w-7 h-7 rounded-full object-cover border border-[#27272A] shrink-0"
-              referrerPolicy="no-referrer"
-            />
-            {!isCollapsed && (
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-semibold text-white truncate">
-                  {currentUser.full_name}
+          <div className="space-y-1.5">
+            <div
+              className={`flex items-center gap-2.5 p-1.5 rounded-lg bg-[#121215] border border-[#27272A] ${
+                isCollapsed ? 'justify-center' : ''
+              }`}
+            >
+              <img
+                src={currentUser.avatar_url}
+                alt={currentUser.full_name}
+                className="w-7 h-7 rounded-full object-cover border border-[#27272A] shrink-0"
+                referrerPolicy="no-referrer"
+              />
+              {!isCollapsed && (
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-semibold text-white truncate">
+                    {currentUser.full_name}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9px] font-mono text-[#A3E635] uppercase font-bold tracking-wider">
+                      {currentUser.role}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-[9px] font-mono text-[#A3E635] uppercase font-bold tracking-wider">
-                    {currentUser.role}
-                  </span>
-                </div>
-              </div>
+              )}
+            </div>
+
+            {onLogout && (
+              <button
+                id="sidebar-logout-btn"
+                onClick={onLogout}
+                title="Log Out and Return to Homepage"
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all cursor-pointer font-medium ${
+                  isCollapsed ? 'justify-center' : ''
+                }`}
+              >
+                <LogOut className="w-4 h-4 shrink-0 text-red-400" />
+                {!isCollapsed && <span className="truncate">Sign Out</span>}
+              </button>
             )}
           </div>
         )}

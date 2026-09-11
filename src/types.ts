@@ -35,10 +35,22 @@ export interface CommentaryItem {
 
 export interface PollOption {
   id: string;
+  poll_id?: string;
   name: string;
-  image: string;
+  image?: string;
   votes: number;
   percentage: number;
+}
+
+export interface Poll {
+  id: string;
+  question: string;
+  category?: string;
+  total_votes: number;
+  options: PollOption[];
+  created_at?: string;
+  expires_at?: string | null;
+  is_active?: boolean;
 }
 
 export interface FixtureItem {
@@ -65,6 +77,8 @@ export interface ArticleCard {
   subtitle?: string;
   image: string;
   author?: string;
+  authorBio?: string;
+  content?: string;
   readTime?: string;
 }
 
@@ -89,6 +103,7 @@ export interface BlogPost {
   commentsCount: number;
   featured?: boolean;
   content?: string;
+  authorBio?: string;
 }
 
 // -------------------------------------------------------------
@@ -96,8 +111,28 @@ export interface BlogPost {
 // -------------------------------------------------------------
 export type AdminRole = 'SUPER_ADMIN' | 'EDITOR' | 'AUTHOR';
 
-export type PostType = 'news' | 'transfer' | 'analysis' | 'opinion';
-export type PostStatus = 'draft' | 'published' | 'scheduled';
+export type PostType =
+  | 'NEWS'
+  | 'TRANSFER'
+  | 'ANALYSIS'
+  | 'MATCH_REPORT'
+  | 'OPINION'
+  | 'news'
+  | 'transfer'
+  | 'analysis'
+  | 'match_report'
+  | 'opinion';
+
+export type PostStatus =
+  | 'DRAFT'
+  | 'PUBLISHED'
+  | 'SCHEDULED'
+  | 'draft'
+  | 'published'
+  | 'scheduled';
+
+export const DEFAULT_EEAT_AUTHOR_BIO =
+  'Kwabo Sports is a premier sports digital platform dedicated to delivering real-time match reports, transfer breaking news, and in-depth tactical analysis across global sports. Learn more on our About Us page or subscribe to Our YouTube Channel for daily live updates.';
 
 export interface Category {
   id: string;
@@ -121,12 +156,13 @@ export interface AdminPost {
   category_slug: string;
   category_color: string;
   post_type: PostType;
-  status: PostStatus | 'PUBLISHED' | 'DRAFT' | 'SCHEDULED';
+  status: PostStatus;
   is_featured: boolean; // "Pin as Front-Page Hero Post"
   author_id: string;
   author_name: string;
   author_role: string;
   author_avatar: string;
+  author_bio?: string;
   views: number;
   view_count?: number; // Alias requested by prompt
   read_time: string;
@@ -147,6 +183,7 @@ export interface AdminProfile {
   created_at: string;
 }
 
+export type Profile = AdminProfile;
 export type AdminUser = AdminProfile;
 
 export interface AdminAuditLog {

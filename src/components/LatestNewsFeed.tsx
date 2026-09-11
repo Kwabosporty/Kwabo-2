@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, MessageSquare, Share2, ArrowRight, Sparkles } from 'lucide-react';
-import { BlogPost, BlogCategoryFilter, ArticleCard, AdminPost } from '../types';
+import { motion, AnimatePresence } from 'motion/react';
+import { Sparkles, ArrowDown, CheckCircle2 } from 'lucide-react';
+import { BlogPost, BlogCategoryFilter, ArticleCard as ArticleCardType, AdminPost } from '../types';
 import { INITIAL_BLOG_POSTS, MORE_BLOG_POSTS } from '../data/blogData';
 import { supabaseService } from '../services/supabaseService';
+import { ArticleCard } from './ArticleCard';
 
 interface LatestNewsFeedProps {
-  onSelectArticle: (article: ArticleCard) => void;
+  onSelectArticle: (article: ArticleCardType) => void;
 }
 
 const CATEGORY_TABS: BlogCategoryFilter[] = [
@@ -60,8 +62,10 @@ export const LatestNewsFeed: React.FC<LatestNewsFeedProps> = ({ onSelectArticle 
     }
     return INITIAL_BLOG_POSTS;
   });
+
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasLoadedMore, setHasLoadedMore] = useState(false);
+  const [newlyLoadedIds, setNewlyLoadedIds] = useState<string[]>([]);
 
   useEffect(() => {
     const handleStorageChange = () => {
@@ -81,34 +85,31 @@ export const LatestNewsFeed: React.FC<LatestNewsFeedProps> = ({ onSelectArticle 
   });
 
   const handleLoadMore = () => {
+    if (isLoadingMore || hasLoadedMore) return;
     setIsLoadingMore(true);
+
     setTimeout(() => {
-      setDisplayedPosts((prev) => [...prev, ...MORE_BLOG_POSTS]);
+      const moreItems = MORE_BLOG_POSTS;
+      const newIds = moreItems.map((p) => p.id);
+
+      setDisplayedPosts((prev) => {
+        const existingIds = new Set(prev.map((item) => item.id));
+        const toAdd = moreItems.filter((item) => !existingIds.has(item.id));
+        return [...prev, ...toAdd];
+      });
+
+      setNewlyLoadedIds(newIds);
       setHasLoadedMore(true);
       setIsLoadingMore(false);
-    }, 500);
+    }, 600);
   };
 
-  const handleCardClick = (post: BlogPost) => {
-    onSelectArticle({
-      id: post.id,
-      title: post.title,
-      subtitle: post.excerpt,
-      image: post.image,
-      category: post.category,
-      categoryType: 'breaking',
-      categoryColor: post.categoryColor,
-      author: `${post.author.name}${post.author.role ? ` • ${post.author.role}` : ''}`,
-      readTime: post.readTime,
-    });
-  };
-
-  const handleShare = (e: React.MouseEvent, title: string) => {
+  const handleShare = (e: React.MouseEvent, title: string, id: string) => {
     e.stopPropagation();
+    const shareUrl = `${window.location.origin}${window.location.pathname}#article=${id}`;
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
+      navigator.clipboard.writeText(shareUrl);
     }
-    alert(`Link copied for: "${title}"`);
   };
 
   return (
@@ -130,7 +131,7 @@ export const LatestNewsFeed: React.FC<LatestNewsFeedProps> = ({ onSelectArticle 
           </span>
         </div>
 
-        {/* Category filter tabs (Right-aligned) */}
+        {/* Category filter tabs */}
         <div
           id="news-category-filters"
           className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-1"
@@ -142,7 +143,7 @@ export const LatestNewsFeed: React.FC<LatestNewsFeedProps> = ({ onSelectArticle 
                 key={tab}
                 id={`filter-tab-${tab.toLowerCase().replace(/\s+/g, '-')}`}
                 onClick={() => setActiveCategory(tab)}
-                className={`text-xs font-bold px-3 py-1.5 rounded-md whitespace-nowrap transition-all uppercase tracking-wider select-none ${
+                className={`text-xs font-bold px-3 py-1.5 rounded-md whitespace-nowrap transition-all uppercase tracking-wider select-none cursor-pointer ${
                   isActive
                     ? 'bg-[#00E5FF]/15 text-[#00E5FF] border border-[#00E5FF] shadow-[0_0_12px_rgba(0,229,255,0.25)]'
                     : 'text-neutral-400 hover:text-white bg-[#1A1D24] hover:bg-[#222732] border border-transparent'
@@ -161,7 +162,7 @@ export const LatestNewsFeed: React.FC<LatestNewsFeedProps> = ({ onSelectArticle 
           <p className="text-sm font-semibold text-white">No articles found in this category.</p>
           <button
             onClick={() => setActiveCategory('ALL')}
-            className="text-xs text-[#00E5FF] hover:underline"
+            className="text-xs text-[#00E5FF] hover:underline cursor-pointer"
           >
             Reset filter to ALL
           </button>
@@ -169,228 +170,85 @@ export const LatestNewsFeed: React.FC<LatestNewsFeedProps> = ({ onSelectArticle 
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredPosts.map((post, idx) => {
-            // First item is featured (spans 2 cols on md/lg) when on ALL tab or when featured is true
             const isFeatured = idx === 0 && (activeCategory === 'ALL' || post.featured);
+            const isNewlyLoaded = newlyLoadedIds.includes(post.id);
+            const loadMoreIndex = newlyLoadedIds.indexOf(post.id);
 
-            if (isFeatured) {
-              return (
-                <article
-                  key={post.id}
-                  id={`featured-card-${post.id}`}
-                  onClick={() => handleCardClick(post)}
-                  className="md:col-span-2 lg:col-span-2 group bg-[#1A1A1A] hover:bg-[#1E1E22] border border-[#2B303D] hover:border-[#A3E635] hover:shadow-[0_0_20px_rgba(163,230,53,0.18)] rounded-xl overflow-hidden cursor-pointer transition-all duration-300 flex flex-col lg:flex-row"
-                >
-                  {/* Image Container (Left on desktop) */}
-                  <div className="relative lg:w-3/5 overflow-hidden aspect-video lg:aspect-auto min-h-[260px]">
-                    <img
-                      src={post.image}
-                      alt={post.title}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500 brightness-90"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#1A1A1A] via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-[#1A1A1A]" />
-
-                    {/* Category Badge (Top-Left overlay) */}
-                    <div className="absolute top-3.5 left-3.5 z-10">
-                      <span
-                        className="text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-full shadow-md select-none"
-                        style={{
-                          backgroundColor: post.categoryColor,
-                          color: post.categoryColor === '#A3E635' || post.categoryColor === '#00E5FF' || post.categoryColor === '#FACC15' ? '#000000' : '#FFFFFF',
-                        }}
-                      >
-                        {post.category}
-                      </span>
-                    </div>
-
-                    {/* Reading Time (Top-Right overlay) */}
-                    <div className="absolute top-3.5 right-3.5 z-10 bg-black/75 backdrop-blur-xs border border-white/10 text-neutral-200 text-[11px] font-mono px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
-                      <Clock className="w-3 h-3 text-[#A3E635]" />
-                      <span>{post.readTime}</span>
-                    </div>
-
-                    {/* High Priority Editorial Tag */}
-                    <div className="absolute bottom-3 left-3.5 hidden lg:block z-10">
-                      <span className="text-[10px] font-mono uppercase bg-[#121417]/80 text-[#00E5FF] px-2 py-0.5 rounded border border-[#00E5FF]/30 backdrop-blur-xs">
-                        ★ LEAD STORY
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Content Body & Footer (Right on desktop) */}
-                  <div className="p-5 sm:p-6 lg:w-2/5 flex flex-col justify-between space-y-4">
-                    <div className="space-y-3">
-                      {/* Meta Line */}
-                      <div className="flex items-center gap-2 text-xs text-neutral-400">
-                        {post.author.avatar ? (
-                          <img
-                            src={post.author.avatar}
-                            alt={post.author.name}
-                            referrerPolicy="no-referrer"
-                            className="w-5 h-5 rounded-full object-cover border border-neutral-700"
-                          />
-                        ) : null}
-                        <span className="text-white font-medium">{post.author.name}</span>
-                        <span>•</span>
-                        <span className="font-mono text-neutral-400">{post.date}</span>
-                      </div>
-
-                      {/* Article Title */}
-                      <h3 className="text-lg sm:text-xl font-black text-white group-hover:text-[#A3E635] transition-colors leading-snug line-clamp-3 font-sport">
-                        {post.title}
-                      </h3>
-
-                      {/* Excerpt */}
-                      <p className="text-xs sm:text-sm text-[#9CA3AF] line-clamp-3 leading-relaxed">
-                        {post.excerpt}
-                      </p>
-                    </div>
-
-                    {/* Card Footer */}
-                    <div className="pt-3 border-t border-[#2B303D] flex items-center justify-between">
-                      <span className="inline-flex items-center gap-1 text-xs font-black text-[#A3E635] tracking-wider uppercase group-hover:translate-x-1 transition-transform">
-                        <span>READ STORY</span>
-                        <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                      </span>
-
-                      <div className="flex items-center gap-3 text-neutral-400 text-xs">
-                        <span className="flex items-center gap-1">
-                          <MessageSquare className="w-3.5 h-3.5" />
-                          <span className="font-mono">{post.commentsCount}</span>
-                        </span>
-                        <button
-                          onClick={(e) => handleShare(e, post.title)}
-                          className="hover:text-white p-1 rounded hover:bg-neutral-800 transition-colors"
-                          title="Share article"
-                        >
-                          <Share2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              );
-            }
-
-            // Standard 1-column Card Stack
             return (
-              <article
+              <ArticleCard
                 key={post.id}
-                id={`article-card-${post.id}`}
-                onClick={() => handleCardClick(post)}
-                className="group bg-[#1A1A1A] hover:bg-[#1E1E22] border border-[#2B303D] hover:border-[#A3E635] hover:shadow-[0_0_20px_rgba(163,230,53,0.18)] rounded-xl overflow-hidden cursor-pointer transition-all duration-300 flex flex-col justify-between"
-              >
-                {/* A. Image Container (Top: 16:9 aspect ratio) */}
-                <div className="relative aspect-video w-full overflow-hidden bg-[#15171C]">
-                  <img
-                    src={post.image}
-                    alt={post.title}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500 brightness-90"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#1A1A1A] via-transparent to-transparent opacity-60" />
-
-                  {/* Category Badge (Top-Left overlay) */}
-                  <div className="absolute top-3 left-3 z-10">
-                    <span
-                      className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-md select-none"
-                      style={{
-                        backgroundColor: post.categoryColor,
-                        color: post.categoryColor === '#A3E635' || post.categoryColor === '#00E5FF' || post.categoryColor === '#FACC15' ? '#000000' : '#FFFFFF',
-                      }}
-                    >
-                      {post.category}
-                    </span>
-                  </div>
-
-                  {/* Reading Time (Top-Right overlay) */}
-                  <div className="absolute top-3 right-3 z-10 bg-black/75 backdrop-blur-xs border border-white/10 text-neutral-200 text-[10px] font-mono px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-                    <Clock className="w-3 h-3 text-[#A3E635]" />
-                    <span>{post.readTime}</span>
-                  </div>
-                </div>
-
-                {/* B. Content Body (Middle) */}
-                <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-3">
-                  <div className="space-y-2">
-                    {/* Meta Line: Date published and Author Name */}
-                    <div className="flex items-center gap-2 text-[11px] text-neutral-400">
-                      {post.author.avatar ? (
-                        <img
-                          src={post.author.avatar}
-                          alt={post.author.name}
-                          referrerPolicy="no-referrer"
-                          className="w-4 h-4 rounded-full object-cover border border-neutral-700"
-                        />
-                      ) : null}
-                      <span className="text-white font-medium">{post.author.name}</span>
-                      <span>•</span>
-                      <span className="font-mono text-neutral-400">{post.date}</span>
-                    </div>
-
-                    {/* Article Title: 2-line clamped heading, shifts to Lime Green on hover */}
-                    <h3 className="text-sm sm:text-base font-bold text-white group-hover:text-[#A3E635] transition-colors line-clamp-2 leading-snug font-sport">
-                      {post.title}
-                    </h3>
-
-                    {/* Excerpt: 2-line clamped summary text in muted light gray (#9CA3AF) */}
-                    <p className="text-xs text-[#9CA3AF] line-clamp-2 leading-relaxed">
-                      {post.excerpt}
-                    </p>
-                  </div>
-
-                  {/* C. Card Footer (Bottom) */}
-                  <div className="pt-3 border-t border-[#2B303D] flex items-center justify-between">
-                    {/* "Read More" Action */}
-                    <span className="inline-flex items-center gap-1 text-xs font-extrabold text-[#A3E635] tracking-wider uppercase group-hover:translate-x-1 transition-transform">
-                      <span>READ STORY</span>
-                      <ArrowRight className="w-3 h-3 stroke-[2.5]" />
-                    </span>
-
-                    {/* Social / Engagement */}
-                    <div className="flex items-center gap-2.5 text-neutral-400 text-xs">
-                      <span className="flex items-center gap-1">
-                        <MessageSquare className="w-3 h-3" />
-                        <span className="font-mono text-[11px]">{post.commentsCount}</span>
-                      </span>
-                      <button
-                        onClick={(e) => handleShare(e, post.title)}
-                        className="hover:text-white p-1 rounded hover:bg-neutral-800 transition-colors"
-                        title="Share article"
-                      >
-                        <Share2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </article>
+                post={post}
+                isFeatured={isFeatured}
+                isNewlyLoaded={isNewlyLoaded}
+                animationIndex={loadMoreIndex >= 0 ? loadMoreIndex : idx}
+                onSelectArticle={onSelectArticle}
+                onShare={handleShare}
+              />
             );
           })}
+
+          {/* SKELETON PREVIEW WHILE LOADING MORE */}
+          {isLoadingMore && (
+            <>
+              {[1, 2, 3].map((skeletonIdx) => (
+                <motion.div
+                  key={`loading-skeleton-${skeletonIdx}`}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3, delay: skeletonIdx * 0.05 }}
+                  className="bg-[#181B22] border border-[#262D3B] rounded-xl overflow-hidden animate-pulse flex flex-col justify-between"
+                >
+                  <div className="aspect-video bg-[#202532] w-full relative">
+                    <div className="absolute top-3 left-3 w-20 h-4 bg-[#2C3345] rounded-full" />
+                    <div className="absolute top-3 right-3 w-14 h-4 bg-[#2C3345] rounded-full" />
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <div className="w-24 h-3 bg-[#262D3B] rounded" />
+                    <div className="w-full h-4 bg-[#262D3B] rounded" />
+                    <div className="w-4/5 h-4 bg-[#262D3B] rounded" />
+                    <div className="w-full h-10 bg-[#202532] rounded mt-4" />
+                  </div>
+                </motion.div>
+              ))}
+            </>
+          )}
         </div>
       )}
 
       {/* 4. INTERACTIVE CALL-TO-ACTION (LOAD MORE) */}
-      <div className="pt-4 flex justify-center">
+      <div className="pt-4 flex flex-col items-center justify-center gap-2">
         {!hasLoadedMore ? (
-          <button
+          <motion.button
             id="load-more-articles-btn"
             onClick={handleLoadMore}
             disabled={isLoadingMore}
-            className="border-2 border-[#A3E635] text-white bg-[#121212] hover:bg-[#A3E635] hover:text-black transition-all px-8 py-3 rounded-lg text-xs sm:text-sm font-black uppercase tracking-wider font-sport shadow-[0_0_15px_rgba(163,230,53,0.15)] flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="border-2 border-[#A3E635] text-white bg-[#121212] hover:bg-[#A3E635] hover:text-black transition-all px-8 py-3 rounded-lg text-xs sm:text-sm font-black uppercase tracking-wider font-sport shadow-[0_0_15px_rgba(163,230,53,0.15)] flex items-center gap-2.5 disabled:opacity-60 cursor-pointer group"
           >
             {isLoadingMore ? (
               <>
                 <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                <span>FETCHING HEADLINES...</span>
+                <span>FETCHING NEW STORIES...</span>
               </>
             ) : (
-              <span>LOAD MORE ARTICLES</span>
+              <>
+                <span>LOAD MORE ARTICLES</span>
+                <ArrowDown className="w-4 h-4 stroke-[2.5] group-hover:translate-y-0.5 transition-transform" />
+              </>
             )}
-          </button>
+          </motion.button>
         ) : (
-          <div className="text-center text-xs text-neutral-400 font-mono py-2">
-            ✓ You&apos;re completely up to date with the latest KwaboSports coverage.
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="flex items-center gap-2 text-xs text-neutral-400 font-mono py-3 px-5 rounded-full bg-[#181B20] border border-[#272D3B]"
+          >
+            <CheckCircle2 className="w-4 h-4 text-[#A3E635]" />
+            <span>You&apos;re completely up to date with the latest KwaboSports coverage.</span>
+          </motion.div>
         )}
       </div>
     </section>

@@ -1,17 +1,24 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { Bookmark } from 'lucide-react';
+import { motion } from 'motion/react';
 import { HERO_ARTICLE, SECONDARY_CARDS } from '../data/sportsData';
 import { ArticleCard } from '../types';
+import { useBookmarks } from '../utils/bookmarkStorage';
 
 interface HeroBentoProps {
   onSelectArticle?: (article: ArticleCard) => void;
 }
 
 export const HeroBento: React.FC<HeroBentoProps> = ({ onSelectArticle }) => {
-  const [activeSecondaryIndex, setActiveSecondaryIndex] = useState(0);
+  const { isBookmarked, toggleBookmark } = useBookmarks();
 
   const transferCard = SECONDARY_CARDS[0]; // Transfer update
-  const f1Card = SECONDARY_CARDS[1]; // F1 News
   const opinionCard = SECONDARY_CARDS[2]; // Opinion NBA
+
+  const handleToggle = (e: React.MouseEvent, article: ArticleCard) => {
+    e.stopPropagation();
+    toggleBookmark(article);
+  };
 
   return (
     <div id="top-hero-bento-grid" className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 w-full">
@@ -32,6 +39,24 @@ export const HeroBento: React.FC<HeroBentoProps> = ({ onSelectArticle }) => {
           {/* Deep charcoal gradient overlay for crisp legibility */}
           <div className="absolute inset-0 bg-gradient-to-t from-[#0E1013] via-[#0E1013]/60 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#0E1013]/70 via-transparent to-transparent" />
+        </div>
+
+        {/* Top Floating Controls */}
+        <div className="absolute top-4 right-4 z-20">
+          <motion.button
+            id={`bookmark-hero-${HERO_ARTICLE.id}`}
+            whileTap={{ scale: 0.85 }}
+            onClick={(e) => handleToggle(e, HERO_ARTICLE)}
+            title={isBookmarked(HERO_ARTICLE.id) ? 'Saved to Bookmarks' : 'Save to Bookmarks'}
+            aria-label="Bookmark hero article"
+            className={`p-2 rounded-xl backdrop-blur-md transition-all cursor-pointer ${
+              isBookmarked(HERO_ARTICLE.id)
+                ? 'bg-[#A3E635] text-black shadow-[0_0_15px_rgba(163,230,53,0.4)]'
+                : 'bg-black/60 text-white/80 hover:text-white hover:bg-black/80 border border-white/10'
+            }`}
+          >
+            <Bookmark className={`w-4 h-4 ${isBookmarked(HERO_ARTICLE.id) ? 'fill-black' : ''}`} />
+          </motion.button>
         </div>
 
         {/* Content Overlay */}
@@ -63,7 +88,7 @@ export const HeroBento: React.FC<HeroBentoProps> = ({ onSelectArticle }) => {
 
       {/* RIGHT: Vertical Stack (40% width / 5 cols on lg) */}
       <div id="hero-secondary-stack" className="lg:col-span-5 xl:col-span-5 flex flex-col gap-3.5">
-        {/* Card 1: TRANSFER UPDATE (with toggle to F1 or dual feature) */}
+        {/* Card 1: TRANSFER UPDATE */}
         <div
           id="secondary-card-transfer"
           onClick={() => onSelectArticle && onSelectArticle(transferCard)}
@@ -80,6 +105,24 @@ export const HeroBento: React.FC<HeroBentoProps> = ({ onSelectArticle }) => {
             <div className="absolute inset-0 bg-gradient-to-t from-[#0E1013] via-[#0E1013]/60 to-transparent" />
           </div>
 
+          {/* Top Bookmark */}
+          <div className="absolute top-3 right-3 z-20">
+            <motion.button
+              id={`bookmark-secondary-${transferCard.id}`}
+              whileTap={{ scale: 0.85 }}
+              onClick={(e) => handleToggle(e, transferCard)}
+              title={isBookmarked(transferCard.id) ? 'Saved' : 'Bookmark story'}
+              aria-label="Bookmark transfer story"
+              className={`p-1.5 rounded-lg backdrop-blur-md transition-all cursor-pointer ${
+                isBookmarked(transferCard.id)
+                  ? 'bg-[#A3E635] text-black shadow-[0_0_12px_rgba(163,230,53,0.4)]'
+                  : 'bg-black/60 text-white/80 hover:text-white hover:bg-black/80 border border-white/10'
+              }`}
+            >
+              <Bookmark className={`w-3.5 h-3.5 ${isBookmarked(transferCard.id) ? 'fill-black' : ''}`} />
+            </motion.button>
+          </div>
+
           {/* Content */}
           <div className="relative z-10 p-4 space-y-1.5">
             <div className="flex items-center gap-2">
@@ -94,7 +137,7 @@ export const HeroBento: React.FC<HeroBentoProps> = ({ onSelectArticle }) => {
           </div>
         </div>
 
-        {/* Card 2: OPINION (NBA headshot) */}
+        {/* Card 2: OPINION */}
         <div
           id="secondary-card-opinion"
           onClick={() => onSelectArticle && onSelectArticle(opinionCard)}
@@ -109,6 +152,24 @@ export const HeroBento: React.FC<HeroBentoProps> = ({ onSelectArticle }) => {
               className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500 brightness-85"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0E1013] via-[#0E1013]/60 to-transparent" />
+          </div>
+
+          {/* Top Bookmark */}
+          <div className="absolute top-3 right-3 z-20">
+            <motion.button
+              id={`bookmark-secondary-${opinionCard.id}`}
+              whileTap={{ scale: 0.85 }}
+              onClick={(e) => handleToggle(e, opinionCard)}
+              title={isBookmarked(opinionCard.id) ? 'Saved' : 'Bookmark story'}
+              aria-label="Bookmark opinion story"
+              className={`p-1.5 rounded-lg backdrop-blur-md transition-all cursor-pointer ${
+                isBookmarked(opinionCard.id)
+                  ? 'bg-[#A3E635] text-black shadow-[0_0_12px_rgba(163,230,53,0.4)]'
+                  : 'bg-black/60 text-white/80 hover:text-white hover:bg-black/80 border border-white/10'
+              }`}
+            >
+              <Bookmark className={`w-3.5 h-3.5 ${isBookmarked(opinionCard.id) ? 'fill-black' : ''}`} />
+            </motion.button>
           </div>
 
           {/* Content */}

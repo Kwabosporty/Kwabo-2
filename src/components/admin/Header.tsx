@@ -264,6 +264,19 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
         )}
+
+        {/* Explicit Sign Out Button in Header Bar */}
+        {currentUser && (
+          <button
+            id="header-explicit-signout-btn"
+            onClick={onLogout}
+            title="Sign out of Admin Command Center"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#141417] hover:bg-red-500/10 text-neutral-400 hover:text-red-400 border border-[#27272A] hover:border-red-500/30 transition-all text-xs font-mono"
+          >
+            <LogOut className="w-3.5 h-3.5 text-red-400" />
+            <span className="hidden md:inline">Sign Out</span>
+          </button>
+        )}
       </div>
     </header>
   );

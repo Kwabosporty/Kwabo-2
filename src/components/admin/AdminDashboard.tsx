@@ -47,11 +47,13 @@ import {
 interface AdminDashboardProps {
   onViewPublicSite: () => void;
   onPreviewArticleModal?: (article: ArticleCard) => void;
+  onUserChange?: (user: AdminProfile | null) => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onViewPublicSite,
   onPreviewArticleModal,
+  onUserChange,
 }) => {
   // Navigation & Shell States
   const [currentTab, setCurrentTab] = useState<AdminTab>('dashboard');
@@ -131,7 +133,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setStats(supabaseService.getStats());
     });
 
-    return () => unsub();
+    // Hash-based URL route parser for /admin/posts/new and /admin/posts/edit/[id]
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (hash === 'admin/posts/new' || hash === '/admin/posts/new') {
+        setPostToEdit(null);
+        setCurrentTab('create-post');
+      } else if (hash.startsWith('admin/posts/edit/') || hash.startsWith('/admin/posts/edit/')) {
+        const id = hash.split('admin/posts/edit/')[1]?.replace('/', '');
+        if (id) {
+          const allPosts = supabaseService.getPosts();
+          const target = allPosts.find((p) => p.id === id);
+          if (target) {
+            setPostToEdit(target);
+            setCurrentTab('create-post');
+          }
+        }
+      }
+    };
+
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+
+    return () => {
+      unsub();
+      window.removeEventListener('hashchange', handleHashChange);
+    };
   }, []);
 
   // Keyboard shortcut Ctrl+B or ⌘+B to collapse/expand sidebar
@@ -150,10 +177,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleLogout = () => {
     supabaseService.logout();
     setCurrentUser(null);
+    if (onUserChange) onUserChange(null);
+    onViewPublicSite();
   };
 
   const handleLoginSuccess = (user: AdminProfile) => {
     setCurrentUser(user);
+    if (onUserChange) onUserChange(user);
     refreshAllData();
     setCurrentTab('dashboard');
   };
@@ -171,11 +201,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     refreshAllData();
     setPostToEdit(null);
     setCurrentTab('posts');
+    window.location.hash = 'admin/posts';
   };
 
   const handleEditPost = (post: AdminPost) => {
     setPostToEdit(post);
     setCurrentTab('create-post');
+    window.location.hash = `admin/posts/edit/${post.id}`;
   };
 
   const handleDeletePost = (postId: string) => {
@@ -199,6 +231,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         categoryType: 'breaking',
         categoryColor: post.category_color,
         author: `${post.author_name} • ${post.author_role}`,
+        authorBio: post.author_bio,
+        content: post.content,
         readTime: post.read_time,
       });
     }
@@ -232,7 +266,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // -------------------------------------------------------------
-  // PROTECTED AUTHENTICATION CHECK
+  // PROTECTED AUTHENTICATION & ROLE CHECK (NEXT.JS MIDDLEWARE SIMULATION)
   // -------------------------------------------------------------
   if (!currentUser) {
     return (
@@ -240,7 +274,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         onLoginSuccess={handleLoginSuccess}
         onViewPublicSite={onViewPublicSite}
         onLogin={(email, pass) => supabaseService.login(email, pass)}
-        onSignup={(data) => supabaseService.signup(data)}
+      />
+    );
+  }
+
+  // 403 ACCESS DENIED CHECK: Role must strictly be SUPER_ADMIN or EDITOR
+  if (currentUser.role !== 'SUPER_ADMIN' && currentUser.role !== 'EDITOR') {
+    // Sign out immediately as per Next.js middleware specification
+    supabaseService.logout();
+    return (
+      <AdminAuthView
+        onLoginSuccess={handleLoginSuccess}
+        onViewPublicSite={onViewPublicSite}
+        onLogin={(email, pass) => supabaseService.login(email, pass)}
+        initialError="403 Access Denied: Admin Privileges Required. Role in public.profiles lacks SUPER_ADMIN or EDITOR claims."
       />
     );
   }
@@ -255,13 +302,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <Sidebar
           currentTab={currentTab}
           onSelectTab={(tab) => {
-            if (tab === 'create-post') setPostToEdit(null);
+            if (tab === 'create-post') {
+              setPostToEdit(null);
+              window.location.hash = 'admin/posts/new';
+            } else if (tab === 'posts') {
+              window.location.hash = 'admin/posts';
+            }
             setCurrentTab(tab);
           }}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           currentUser={currentUser}
           onViewPublicSite={onViewPublicSite}
+          onLogout={handleLogout}
         />
       </div>
 
@@ -302,7 +355,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <Sidebar
                   currentTab={currentTab}
                   onSelectTab={(tab) => {
-                    if (tab === 'create-post') setPostToEdit(null);
+                    if (tab === 'create-post') {
+                      setPostToEdit(null);
+                      window.location.hash = 'admin/posts/new';
+                    } else if (tab === 'posts') {
+                      window.location.hash = 'admin/posts';
+                    }
                     setCurrentTab(tab);
                     setIsMobileDrawerOpen(false);
                   }}
@@ -310,6 +368,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   onToggleCollapse={() => {}}
                   currentUser={currentUser}
                   onViewPublicSite={onViewPublicSite}
+                  onLogout={handleLogout}
                 />
               </div>
             </motion.div>
@@ -368,47 +427,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               {/* 3. REAL-TIME SUPABASE INTEGRATION: TOP METRIC CARDS ROW (4-COLUMNS GRID) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                {/* 1. Total Published Articles */}
+                {/* 1. Total Published Posts (status = 'PUBLISHED') */}
                 <StatCard
-                  title="Total Published"
+                  title="Total Published Posts"
                   value={stats.total_posts.toString()}
-                  subtitle={`${stats.drafts_pending} pending in Drafts`}
+                  subtitle={`${stats.drafts_pending} drafts pending`}
                   icon={FileCheck2}
                   accentColor="lime"
-                  badge="PUBLISHED"
+                  badge="status = 'PUBLISHED'"
                   trend={{ value: '+12% this week', isPositive: true }}
                 />
 
-                {/* 2. Total Dynamic Views */}
+                {/* 2. Total Article Views (SUM(view_count)) */}
                 <StatCard
-                  title="Dynamic Views"
+                  title="Total Article Views"
                   value={stats.total_views.toLocaleString()}
-                  subtitle={`${stats.today_views.toLocaleString()} visits tracked today`}
+                  subtitle={`${stats.today_views.toLocaleString()} visits today`}
                   icon={TrendingUp}
                   accentColor="cyan"
-                  badge="SUM(VIEWS)"
+                  badge="SUM(view_count)"
                   trend={{ value: '+18.4%', isPositive: true }}
                 />
 
-                {/* 3. Active Categories */}
+                {/* 3. Active Categories Count */}
                 <StatCard
-                  title="Active Categories"
+                  title="Active Categories Count"
                   value={stats.active_categories.toString()}
-                  subtitle="Taxonomy hubs & tags active"
+                  subtitle="Active taxonomy & hubs"
                   icon={FolderTree}
                   accentColor="yellow"
-                  badge="TAXONOMY"
+                  badge="ACTIVE COUNT"
                 />
 
-                {/* 4. Live Match Feed Status */}
+                {/* 4. Sports Feed Status ('Live Sync Active') */}
                 <StatCard
-                  title="Match Feed Status"
-                  value="Synced 2 mins ago"
-                  subtitle="Cron worker: Every 60s"
+                  title="Sports Feed Status"
+                  value="Live Sync Active"
+                  subtitle="Ingestion cron every 60s"
                   icon={Radio}
                   accentColor="lime"
                   isLive={true}
-                  badge="HEALTHY"
+                  badge="WSS + REST"
                 />
               </div>
 
@@ -451,6 +510,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               onCreateNew={() => {
                 setPostToEdit(null);
                 setCurrentTab('create-post');
+                window.location.hash = 'admin/posts/new';
               }}
               onEditPost={handleEditPost}
               onDeletePost={handleDeletePost}
@@ -467,6 +527,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               onCancel={() => {
                 setPostToEdit(null);
                 setCurrentTab('posts');
+                window.location.hash = 'admin/posts';
               }}
             />
           )}

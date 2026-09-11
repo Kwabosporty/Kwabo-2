@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { Search, ChevronDown, Menu, X, Globe, ShieldCheck } from 'lucide-react';
+import { Search, ChevronDown, Menu, X, Globe, ShieldCheck, LogOut, Bookmark } from 'lucide-react';
+import { AdminProfile } from '../types';
+import { useBookmarks } from '../utils/bookmarkStorage';
 
 interface HeaderNavProps {
   onOpenSearch: () => void;
   onOpenAuth: () => void;
   onOpenAdmin?: () => void;
+  onLogout?: () => void;
+  currentUser?: AdminProfile | null;
   activeNav: string;
   onSelectNav: (nav: string) => void;
   onToggleMobileSidebar: () => void;
@@ -15,11 +19,14 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
   onOpenSearch,
   onOpenAuth,
   onOpenAdmin,
+  onLogout,
+  currentUser,
   activeNav,
   onSelectNav,
   onToggleMobileSidebar,
   isMobileSidebarOpen,
 }) => {
+  const { bookmarkedIds } = useBookmarks();
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   const navItems = [
@@ -137,7 +144,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
           })}
         </nav>
 
-        {/* Right: Search + LOGIN / REGISTER Button */}
+        {/* Right: Search + Saved Bookmarks + Auth Controls */}
         <div className="flex items-center gap-2 sm:gap-3">
           <button
             id="global-search-btn"
@@ -149,25 +156,81 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
             <Search className="w-5 h-5" />
           </button>
 
-          <button
-            id="login-register-btn"
-            onClick={onOpenAuth}
-            className="border border-[#4B5563] hover:border-[#A3E635] hover:text-[#A3E635] text-white text-xs sm:text-sm font-bold tracking-wider px-3.5 sm:px-5 py-1.5 sm:py-2 rounded-md transition-all uppercase whitespace-nowrap bg-transparent hover:bg-[#A3E635]/10"
+          {/* Bookmarks Counter Indicator */}
+          <div
+            id="header-saved-bookmarks-indicator"
+            title={
+              bookmarkedIds.length > 0
+                ? `${bookmarkedIds.length} article${bookmarkedIds.length === 1 ? '' : 's'} saved to local bookmarks`
+                : 'No saved articles yet. Click bookmark on any article to save locally!'
+            }
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-mono transition-colors select-none ${
+              bookmarkedIds.length > 0
+                ? 'bg-[#192219] text-[#A3E635] border border-[#A3E635]/30'
+                : 'bg-transparent text-neutral-500 border border-transparent'
+            }`}
           >
-            LOGIN / REGISTER
-          </button>
+            <Bookmark className={`w-3.5 h-3.5 ${bookmarkedIds.length > 0 ? 'fill-[#A3E635]' : ''}`} />
+            <span className="font-bold">{bookmarkedIds.length}</span>
+            <span className="hidden lg:inline text-[11px] text-neutral-400">SAVED</span>
+          </div>
 
-          {onOpenAdmin && (
+          {!currentUser ? (
+            /* Unauthenticated Public Visitor: Show SIGN IN only. Public sign-ups are disabled. ADMIN CMS is NOT visible. */
             <button
-              id="header-admin-cms-btn"
-              onClick={onOpenAdmin}
-              title="Open KwaboSports Admin CMS & Studio"
-              className="bg-[#1C2028] hover:bg-[#252B36] border border-[#2F384A] hover:border-[#A3E635] text-[#A3E635] text-xs font-bold px-3 py-1.5 sm:py-2 rounded-md transition-all uppercase tracking-wider flex items-center gap-1.5 font-sport cursor-pointer shadow-xs"
+              id="header-sign-in-btn"
+              onClick={onOpenAuth}
+              className="border border-[#4B5563] hover:border-[#A3E635] hover:text-[#A3E635] text-white text-xs sm:text-sm font-bold tracking-wider px-3.5 sm:px-5 py-1.5 sm:py-2 rounded-md transition-all uppercase whitespace-nowrap bg-transparent hover:bg-[#A3E635]/10 flex items-center gap-1.5 font-mono"
             >
-              <ShieldCheck className="w-3.5 h-3.5 text-[#A3E635]" />
-              <span className="hidden md:inline">ADMIN CMS</span>
-              <span className="md:hidden">ADMIN</span>
+              <span>SIGN IN</span>
             </button>
+          ) : (
+            /* Authenticated Admin: ONLY accessible after an admin logs in */
+            <div className="flex items-center gap-2">
+              {onOpenAdmin && (
+                <button
+                  id="header-admin-cms-btn"
+                  onClick={onOpenAdmin}
+                  title="Open KwaboSports Admin CMS & Studio"
+                  className="bg-[#1C2028] hover:bg-[#252B36] border border-[#A3E635]/50 hover:border-[#A3E635] text-[#A3E635] text-xs font-bold px-3 py-1.5 sm:py-2 rounded-md transition-all uppercase tracking-wider flex items-center gap-1.5 font-sport cursor-pointer shadow-xs"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#A3E635]" />
+                  <span className="hidden sm:inline">ADMIN CMS</span>
+                  <span className="sm:hidden">CMS</span>
+                </button>
+              )}
+
+              {/* Admin Avatar and Logout Action */}
+              <div className="flex items-center gap-2 pl-2 border-l border-[#27272A]">
+                <button
+                  onClick={onOpenAdmin}
+                  title={`Logged in as ${currentUser.full_name} (${currentUser.role})`}
+                  className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+                >
+                  <img
+                    src={currentUser.avatar_url}
+                    alt={currentUser.full_name}
+                    className="w-7 h-7 rounded-full object-cover border border-[#A3E635]/50"
+                    referrerPolicy="no-referrer"
+                  />
+                  <span className="hidden lg:inline-block text-xs font-semibold text-white max-w-[100px] truncate">
+                    {currentUser.full_name.split(' ')[0]}
+                  </span>
+                </button>
+
+                {onLogout && (
+                  <button
+                    id="header-admin-logout-btn"
+                    onClick={onLogout}
+                    title="Log Out of Admin Session"
+                    className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 px-2 py-1.5 rounded-md border border-transparent hover:border-red-500/20 transition-all font-mono font-medium"
+                  >
+                    <LogOut className="w-3.5 h-3.5 text-red-400" />
+                    <span className="hidden sm:inline">LOGOUT</span>
+                  </button>
+                )}
+              </div>
+            </div>
           )}
         </div>
       </div>

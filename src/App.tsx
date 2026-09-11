@@ -5,7 +5,7 @@ import { LeftSidebar } from './components/LeftSidebar';
 import { HeroBento } from './components/HeroBento';
 import { LeagueHubWidget } from './components/LeagueHubWidget';
 import { LiveMatchCentreWidget } from './components/LiveMatchCentreWidget';
-import { FanZonePollWidget } from './components/FanZonePollWidget';
+import { FanZonePoll } from './components/FanZonePoll';
 import { UpcomingFixtures } from './components/UpcomingFixtures';
 import { LatestNewsFeed } from './components/LatestNewsFeed';
 import { Footer } from './components/Footer';
@@ -13,10 +13,12 @@ import { SearchModal } from './components/SearchModal';
 import { AuthModal } from './components/AuthModal';
 import { ArticleModal } from './components/ArticleModal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
-import { ArticleCard } from './types';
+import { ArticleCard, AdminProfile } from './types';
+import { supabaseService } from './services/supabaseService';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<'public' | 'admin'>('public');
+  const [currentUser, setCurrentUser] = useState<AdminProfile | null>(() => supabaseService.getCurrentUser());
   const [activeNav, setActiveNav] = useState('all-sports');
   const [selectedSport, setSelectedSport] = useState('football');
   const [selectedLeague, setSelectedLeague] = useState('premier-league');
@@ -28,28 +30,35 @@ export default function App() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<ArticleCard | null>(null);
 
-  // Check URL hash for direct #admin link
+  // Check URL hash for direct #admin and #admin/login links
   useEffect(() => {
-    if (window.location.hash === '#admin') {
-      setCurrentView('admin');
-    }
-    const handleHashChange = () => {
-      if (window.location.hash === '#admin') {
+    const checkHash = () => {
+      const hash = window.location.hash.toLowerCase();
+      if (hash.includes('admin')) {
         setCurrentView('admin');
       } else {
         setCurrentView('public');
       }
     };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+
+    checkHash();
+    window.addEventListener('hashchange', checkHash);
+    return () => window.removeEventListener('hashchange', checkHash);
   }, []);
 
   const handleNavigateAdmin = () => {
     setCurrentView('admin');
-    window.location.hash = 'admin';
+    window.location.hash = 'admin/dashboard';
   };
 
   const handleNavigatePublic = () => {
+    setCurrentView('public');
+    window.location.hash = '';
+  };
+
+  const handleLogout = () => {
+    supabaseService.logout();
+    setCurrentUser(null);
     setCurrentView('public');
     window.location.hash = '';
   };
@@ -59,6 +68,7 @@ export default function App() {
       <>
         <AdminDashboard
           onViewPublicSite={handleNavigatePublic}
+          onUserChange={setCurrentUser}
           onPreviewArticleModal={(article) => setSelectedArticle(article)}
         />
         <ArticleModal
@@ -77,6 +87,8 @@ export default function App() {
       {/* 2.B: Brand & Navigation Bar (Below Ticker) */}
       <HeaderNav
         activeNav={activeNav}
+        currentUser={currentUser}
+        onLogout={handleLogout}
         onSelectNav={(nav) => {
           setActiveNav(nav);
           if (nav === 'football' || nav === 'basketball' || nav === 'motorsport') {
@@ -134,7 +146,7 @@ export default function App() {
 
             {/* Column C: FAN ZONE POLL */}
             <div className="flex flex-col md:col-span-2 lg:col-span-1">
-              <FanZonePollWidget />
+              <FanZonePoll />
             </div>
           </section>
 
@@ -167,6 +179,10 @@ export default function App() {
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         onOpenAdmin={handleNavigateAdmin}
+        onLoginAdmin={(user) => {
+          setCurrentUser(user);
+          handleNavigateAdmin();
+        }}
       />
 
       <ArticleModal
