@@ -274,6 +274,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         onLoginSuccess={handleLoginSuccess}
         onViewPublicSite={onViewPublicSite}
         onLogin={(email, pass) => supabaseService.login(email, pass)}
+        onRegister={(email, pass) => supabaseService.register(email, pass)}
       />
     );
   }
@@ -287,7 +288,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         onLoginSuccess={handleLoginSuccess}
         onViewPublicSite={onViewPublicSite}
         onLogin={(email, pass) => supabaseService.login(email, pass)}
-        initialError="403 Access Denied: Admin Privileges Required. Role in public.profiles lacks SUPER_ADMIN or EDITOR claims."
+        onRegister={(email, pass) => supabaseService.register(email, pass)}
+        initialError="Access Denied: Admin Privileges Required"
       />
     );
   }
