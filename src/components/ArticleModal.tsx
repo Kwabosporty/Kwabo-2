@@ -96,7 +96,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
               whileTap={{ scale: 0.88 }}
               onClick={handleToggleBookmark}
               aria-label={isSaved ? 'Remove bookmark' : 'Bookmark article'}
-              title={isSaved ? 'Saved in localStorage' : 'Bookmark this story'}
+              title={isSaved ? 'Saved to Bookmarks' : 'Bookmark this story'}
               className={`p-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-xs font-mono ${
                 isSaved
                   ? 'bg-[#A3E635]/20 text-[#A3E635] border border-[#A3E635]/40 shadow-[0_0_12px_rgba(163,230,53,0.3)]'

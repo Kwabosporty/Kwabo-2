@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../services/supabaseService';
 import { ArticleCard } from '../types';
 
-const STORAGE_KEY_BOOKMARKS = 'kwabo_bookmarked_articles';
 const BOOKMARK_EVENT = 'kwabo_bookmarks_updated';
 
 export interface SavedArticleItem {
@@ -16,26 +16,77 @@ export interface SavedArticleItem {
   savedAt: string;
 }
 
+// In-memory Runtime Store (ZERO localStorage)
+let inMemoryBookmarks: SavedArticleItem[] = [];
+let hasSyncedWithSupabase = false;
+
+// Cross-tab broadcast channel for instantaneous sync without localStorage
+let bookmarkBroadcast: BroadcastChannel | null = null;
+try {
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    bookmarkBroadcast = new BroadcastChannel('kwabo_bookmarks_channel');
+    bookmarkBroadcast.onmessage = (ev) => {
+      if (ev.data && Array.isArray(ev.data.bookmarks)) {
+        inMemoryBookmarks = ev.data.bookmarks;
+        window.dispatchEvent(new CustomEvent(BOOKMARK_EVENT));
+      }
+    };
+  }
+} catch {
+  // BroadcastChannel unavailable in some environments
+}
+
 /**
- * Reads all bookmarked items from localStorage
+ * Syncs bookmarks directly from Supabase bookmarks table
+ */
+export async function syncBookmarksFromSupabase(): Promise<void> {
+  if (hasSyncedWithSupabase) return;
+  hasSyncedWithSupabase = true;
+
+  if (!supabase) return;
+
+  try {
+    const { data, error } = await supabase
+      .from('bookmarks')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && data && Array.isArray(data)) {
+      inMemoryBookmarks = data.map((row: any) => ({
+        id: row.article_id || row.id,
+        title: row.title || 'Untitled Article',
+        category: row.category || 'Sports',
+        categoryColor: row.category_color || '#00E5FF',
+        image: row.image || '',
+        subtitle: row.subtitle,
+        author: row.author,
+        readTime: row.read_time || '3 min read',
+        savedAt: row.created_at || new Date().toISOString(),
+      }));
+      window.dispatchEvent(new CustomEvent(BOOKMARK_EVENT));
+    }
+  } catch (err) {
+    console.warn('Supabase bookmark sync notice:', err);
+  }
+}
+
+// Auto-trigger sync on module load in browser
+if (typeof window !== 'undefined') {
+  syncBookmarksFromSupabase();
+}
+
+/**
+ * Reads all bookmarked items from active in-memory store
  */
 export function getSavedBookmarks(): SavedArticleItem[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_BOOKMARKS);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error('Error reading bookmarks from localStorage:', err);
-    return [];
-  }
+  return [...inMemoryBookmarks];
 }
 
 /**
  * Returns set of bookmarked article IDs for fast lookup
  */
 export function getSavedBookmarkIds(): string[] {
-  return getSavedBookmarks().map((item) => item.id);
+  return inMemoryBookmarks.map((item) => item.id);
 }
 
 /**
@@ -43,12 +94,11 @@ export function getSavedBookmarkIds(): string[] {
  */
 export function isArticleSaved(id: string): boolean {
   if (!id) return false;
-  const list = getSavedBookmarks();
-  return list.some((item) => item.id === id);
+  return inMemoryBookmarks.some((item) => item.id === id);
 }
 
 /**
- * Toggles bookmark status for an article.
+ * Toggles bookmark status for an article directly in memory and Supabase.
  * Returns true if now bookmarked, false if removed.
  */
 export function toggleArticleBookmark(article: {
@@ -62,17 +112,24 @@ export function toggleArticleBookmark(article: {
   author?: string | { name: string };
   readTime?: string;
 }): boolean {
-  if (typeof window === 'undefined' || !article?.id) return false;
+  if (!article?.id) return false;
 
-  const current = getSavedBookmarks();
-  const exists = current.some((item) => item.id === article.id);
-
-  let updated: SavedArticleItem[];
+  const exists = inMemoryBookmarks.some((item) => item.id === article.id);
   let isSavedNow: boolean;
 
   if (exists) {
-    updated = current.filter((item) => item.id !== article.id);
+    inMemoryBookmarks = inMemoryBookmarks.filter((item) => item.id !== article.id);
     isSavedNow = false;
+
+    // Delete from Supabase bookmarks table
+    if (supabase) {
+      Promise.resolve(
+        supabase
+          .from('bookmarks')
+          .delete()
+          .eq('article_id', article.id)
+      ).catch(() => {});
+    }
   } else {
     const authorName =
       typeof article.author === 'string'
@@ -90,20 +147,45 @@ export function toggleArticleBookmark(article: {
       readTime: article.readTime || '3 min read',
       savedAt: new Date().toISOString(),
     };
-    updated = [newItem, ...current];
+    inMemoryBookmarks = [newItem, ...inMemoryBookmarks];
     isSavedNow = true;
+
+    // Save to Supabase bookmarks table
+    if (supabase) {
+      Promise.resolve(
+        supabase
+          .from('bookmarks')
+          .upsert({
+            article_id: newItem.id,
+            title: newItem.title,
+            category: newItem.category,
+            category_color: newItem.categoryColor,
+            image: newItem.image,
+            subtitle: newItem.subtitle,
+            author: newItem.author,
+            read_time: newItem.readTime,
+            created_at: newItem.savedAt,
+          })
+      ).catch(() => {});
+    }
   }
 
-  try {
-    localStorage.setItem(STORAGE_KEY_BOOKMARKS, JSON.stringify(updated));
-    // Dispatch custom event to notify all components in the current tab
+  // Broadcast to other open tabs via BroadcastChannel (in-memory IPC, zero localStorage)
+  if (bookmarkBroadcast) {
+    try {
+      bookmarkBroadcast.postMessage({ bookmarks: inMemoryBookmarks });
+    } catch {
+      // ignore broadcast error
+    }
+  }
+
+  // Dispatch custom event to notify all components in the current view
+  if (typeof window !== 'undefined') {
     window.dispatchEvent(
       new CustomEvent(BOOKMARK_EVENT, {
         detail: { articleId: article.id, isSaved: isSavedNow },
       })
     );
-  } catch (err) {
-    console.error('Error saving bookmark to localStorage:', err);
   }
 
   return isSavedNow;
@@ -120,14 +202,14 @@ export function useBookmarks() {
       setBookmarkedIds(getSavedBookmarkIds());
     };
 
-    // Listen to in-app changes
-    window.addEventListener(BOOKMARK_EVENT, updateBookmarks);
-    // Listen to cross-tab storage changes
-    window.addEventListener('storage', updateBookmarks);
+    if (typeof window !== 'undefined') {
+      window.addEventListener(BOOKMARK_EVENT, updateBookmarks);
+    }
 
     return () => {
-      window.removeEventListener(BOOKMARK_EVENT, updateBookmarks);
-      window.removeEventListener('storage', updateBookmarks);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener(BOOKMARK_EVENT, updateBookmarks);
+      }
     };
   }, []);
 

@@ -68,14 +68,13 @@ export const LatestNewsFeed: React.FC<LatestNewsFeedProps> = ({ onSelectArticle 
   const [newlyLoadedIds, setNewlyLoadedIds] = useState<string[]>([]);
 
   useEffect(() => {
-    const handleStorageChange = () => {
-      const dbPosts = supabaseService.getPosts().filter((p) => p.status === 'published');
-      if (dbPosts.length > 0) {
-        setDisplayedPosts(dbPosts.map(mapAdminPostToBlogPost));
+    const unsubscribe = supabaseService.subscribeToPostsChange((posts) => {
+      const published = posts.filter((p) => p.status === 'published');
+      if (published.length > 0) {
+        setDisplayedPosts(published.map(mapAdminPostToBlogPost));
       }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    });
+    return () => unsubscribe();
   }, []);
 
   // Filter posts by active category

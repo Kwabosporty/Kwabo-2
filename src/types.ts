@@ -166,6 +166,8 @@ export interface AdminPost {
   views: number;
   view_count?: number; // Alias requested by prompt
   read_time: string;
+  seo_meta_title?: string;
+  seo_meta_description?: string;
   created_at: string;
   updated_at: string;
   published_at?: string | null;

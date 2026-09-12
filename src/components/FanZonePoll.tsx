@@ -63,18 +63,13 @@ const DEFAULT_POLL: Poll = {
   is_active: true,
 };
 
-// Helper to get or generate persistent visitor id (fingerprint)
+// In-memory visitor session identifier (Zero localStorage)
+let sessionVisitorId = '';
 const getOrCreateVisitorId = (): string => {
-  try {
-    let vid = localStorage.getItem('kwabo_visitor_id');
-    if (!vid) {
-      vid = `kwabo_vis_${Math.random().toString(36).substring(2, 10)}_${Date.now().toString(36)}`;
-      localStorage.setItem('kwabo_visitor_id', vid);
-    }
-    return vid;
-  } catch {
-    return `kwabo_vis_${Date.now()}`;
+  if (!sessionVisitorId) {
+    sessionVisitorId = `vis_${Math.random().toString(36).substring(2, 10)}_${Date.now().toString(36)}`;
   }
+  return sessionVisitorId;
 };
 
 export const FanZonePoll: React.FC<FanZonePollProps> = ({
@@ -90,10 +85,6 @@ export const FanZonePoll: React.FC<FanZonePollProps> = ({
   const [votedOptionId, setVotedOptionId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [showVotedToast, setShowVotedToast] = useState<boolean>(false);
-
-  // Storage Keys
-  const voteStorageKey = `voted_poll_${pollId}`;
-  const localPollCacheKey = `kwabo_poll_cache_${pollId}`;
 
   // Recalculate percentages accurately across all options
   const recalculatePercentages = useCallback(
@@ -116,37 +107,35 @@ export const FanZonePoll: React.FC<FanZonePollProps> = ({
     []
   );
 
-  // 1. Initial Data Fetch & Visitor Fingerprint Check
+  // 1. Initial Data Fetch directly from Supabase (Zero localStorage)
   useEffect(() => {
     let isMounted = true;
 
     const initializePoll = async () => {
       setIsLoading(true);
+      const visitorId = getOrCreateVisitorId();
 
-      // Check visitor localStorage vote history
-      try {
-        const existingVote = localStorage.getItem(voteStorageKey);
-        if (existingVote) {
-          setHasVoted(true);
-          setVotedOptionId(existingVote);
-        }
-      } catch (err) {
-        console.warn('LocalStorage access warning:', err);
-      }
-
-      // Check cached local poll data first for snappy rendering
       let loadedPoll: Poll = DEFAULT_POLL;
-      try {
-        const cached = localStorage.getItem(localPollCacheKey);
-        if (cached) {
-          loadedPoll = JSON.parse(cached);
-        }
-      } catch (e) {
-        console.warn('Failed to parse cached poll:', e);
-      }
 
-      // Try fetching active poll options from Supabase if client exists
+      // Check visitor vote directly in Supabase poll_votes table
       if (supabase) {
+        try {
+          const { data: userVote } = await supabase
+            .from('poll_votes')
+            .select('option_id')
+            .eq('poll_id', pollId)
+            .eq('visitor_id', visitorId)
+            .maybeSingle();
+
+          if (userVote?.option_id && isMounted) {
+            setHasVoted(true);
+            setVotedOptionId(userVote.option_id);
+          }
+        } catch (err) {
+          console.warn('Supabase poll_votes check notice:', err);
+        }
+
+        // Fetch live poll options from Supabase
         try {
           const { data: remoteOptions, error } = await supabase
             .from('poll_options')
@@ -174,7 +163,7 @@ export const FanZonePoll: React.FC<FanZonePollProps> = ({
             };
           }
         } catch (supabaseErr) {
-          console.warn('Supabase fetch error, falling back to local dataset:', supabaseErr);
+          console.warn('Supabase fetch error, using live fallback:', supabaseErr);
         }
       }
 
@@ -196,7 +185,7 @@ export const FanZonePoll: React.FC<FanZonePollProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [pollId, initialQuestion, voteStorageKey, localPollCacheKey, recalculatePercentages]);
+  }, [pollId, initialQuestion, recalculatePercentages]);
 
   // 2. Real-Time Supabase Channel Subscription + Multi-Tab Broadcast Sync
   useEffect(() => {
@@ -311,15 +300,7 @@ export const FanZonePoll: React.FC<FanZonePollProps> = ({
     setVotedOptionId(optionId);
     setShowVotedToast(true);
 
-    // 2. Persist vote locally to prevent duplicate votes
-    try {
-      localStorage.setItem(voteStorageKey, optionId);
-      localStorage.setItem(localPollCacheKey, JSON.stringify(updatedPoll));
-    } catch (err) {
-      console.warn('Storage write error:', err);
-    }
-
-    // 3. Broadcast to other open tabs in real-time
+    // 2. Broadcast to other open tabs in real-time (In-Memory IPC, Zero localStorage)
     try {
       const bc = new BroadcastChannel(`kwabo_fanzone_poll_${pollId}`);
       bc.postMessage({ type: 'POLL_VOTE_CAST', options: updatedOptions });
